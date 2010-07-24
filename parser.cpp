@@ -2,6 +2,11 @@
 ///
 /// Adapted from "Antlr grammar for PDDL 3.0" 
 /// Zeyn Saigol (http://www.antlr.org/grammar/1222962012944/Pddl.g)
+///
+/// Notes on ANTLR grammar
+/// ---------------------
+/// ! means throw away that part while building the token's string value. 
+/// ^ means the current node should become the root for the AST.
 
 #define BOOST_SPIRIT_DEBUG  ///$$$ DEFINE THIS WHEN DEBUGGING $$$///
 #include <boost/spirit/include/classic_core.hpp>
@@ -36,29 +41,11 @@ struct pddl_grammar : public grammar<pddl_grammar>
                 "define", "domain", "requirements", "types";
 
             //-----------------------------------------------------------------
-            // OPERATORS
+            // COMMON OPERATORS
             //-----------------------------------------------------------------
-//            chlit<>     PLUS('+');
-//            chlit<>     MINUS('-');
-//            chlit<>     STAR('*');
-//            chlit<>     SLASH('/');
-//            strlit<>    ASSIGN(":=");
-//            chlit<>     COMMA(',');
-//            chlit<>     SEMI(';');
-//            chlit<>     COLON(':');
-//            chlit<>     EQUAL('=');
-//            strlit<>    NOT_EQUAL("<>");
-//            chlit<>     LT('<');
-//            strlit<>    LE("<=");
-//            strlit<>    GE(">=");
-//            chlit<>     GT('>');
             chlit<>     LPAREN('(');
             chlit<>     RPAREN(')');
-//            chlit<>     LBRACK('[');
-//            chlit<>     RBRACK(']');
-//            chlit<>     POINTER('^');
-//            chlit<>     DOT('.');
-//            strlit<>    DOTDOT("..");
+            chlit<>     DASH('-');
 
             //-----------------------------------------------------------------
             // TOKENS
@@ -93,13 +80,14 @@ struct pddl_grammar : public grammar<pddl_grammar>
             domain
                 =   LPAREN >> DEFINE >> domainNameClause
                         >> !requireDef  
-                        >> !typesDef     ;
-//                      >> !constantDef  
-//                      >> !predicatesDef
-//                      >> !functionsDef 
-//                        -constraints   >>
-//                        *structureDef  >>    
-//                    RPAREN;
+                        >> !typesDef   
+                        >> !constantsDef 
+                        >> !predicatesDef
+                        >> !functionsDef
+                        >> !constraints
+                        >>  *structureDef 
+                    >> RPAREN >> lexeme_d[*skipAtEnd]; 
+                    //>> RPAREN; <--- does not work due to "trailing whitespace" bug: http://article.gmane.org/gmane.comp.parsers.spirit.general/4029
 
             domainNameClause
                 =  LPAREN >> DOMAIN_ >> domainName 
@@ -138,12 +126,258 @@ struct pddl_grammar : public grammar<pddl_grammar>
                  =  LPAREN >> as_lower_d[":types"] 
                            >> typedNameList >> RPAREN;
 
+            // If have any typed names, they must come FIRST!
             typedNameList
-                 =  (*identifier | +singleTypeNameList >> *identifier);
+                 =  (+singleTypeNameList >> *identifier | *identifier);
+                 //=  (*identifier | +singleTypeNameList >> *identifier); <-- didn't work for "(:constants no-block - block)"
 
             singleTypeNameList
-                 = (+identifier >> '-' >> identifier);
+                 = +identifier >> DASH >> identifier;
 
+            functionsDef
+                 = LPAREN >> as_lower_d[":functions"] >> functionList >> RPAREN;
+
+            functionList
+                 = *(+atomicFunctionSkeleton >> !(DASH >> functionType));
+
+            atomicFunctionSkeleton
+	         = LPAREN >> functionSymbol >> typedVariableList  >> RPAREN;
+
+            functionSymbol  = NAME ;
+        
+            NAME = identifier;
+
+            VARIABLE  = chlit<>('?') >> identifier;
+
+            NUMBER  = +digit_p >> !(chlit<>('.') >> +digit_p);
+
+            functionType  = identifier;
+
+            constantsDef
+	         = LPAREN >> as_lower_d[":constants"] >> typedNameList 
+                          >> RPAREN;
+
+            predicatesDef
+	         = LPAREN >> as_lower_d[":predicates"] >> +atomicFormulaSkeleton
+                          >> RPAREN;
+
+            atomicFormulaSkeleton
+	         = LPAREN >> predicate >> typedVariableList >> RPAREN;
+
+            predicate 
+                = identifier;
+
+            // If have any typed variables, they must come FIRST!
+            typedVariableList
+                = (+singleTypeVarList >> *VARIABLE | *VARIABLE);
+                // = (*VARIABLE | +singleTypeVarList >> *VARIABLE); <--- didn't work for (:predicates (on-table ?x - block))
+
+            singleTypeVarList
+                = (+VARIABLE >> DASH >> identifier);
+
+            constraints
+	        = LPAREN >> as_lower_d[":constraints"] >> conGD >> RPAREN;
+
+/************* CONSTRAINTS ****************************/
+
+            conGD
+               = LPAREN >> as_lower_d["and"] >> *conGD >> RPAREN
+                    | LPAREN >> as_lower_d["forall"] >> LPAREN >> typedVariableList >> RPAREN >> conGD >> RPAREN
+                    | LPAREN >> as_lower_d["at"] >> as_lower_d["end"] >> goalDesc >> RPAREN
+                    | LPAREN >> as_lower_d["always"] >> goalDesc >> RPAREN
+                    | LPAREN >> as_lower_d["sometime"] >> goalDesc >> RPAREN
+                    | LPAREN >> as_lower_d["within"] >> NUMBER >> goalDesc >> RPAREN
+                    | LPAREN >> as_lower_d["at-most-once"] >> goalDesc >> RPAREN
+                    | LPAREN >> as_lower_d["sometime-after"] >> goalDesc >> goalDesc >> RPAREN
+                    | LPAREN >> as_lower_d["sometime-before"] >> goalDesc >> goalDesc >> RPAREN
+                    | LPAREN >> as_lower_d["always-within"] >> NUMBER >> goalDesc >> goalDesc >> RPAREN
+                    | LPAREN >> as_lower_d["hold-during"] >> NUMBER >> NUMBER >> goalDesc >> RPAREN
+                    | LPAREN >> as_lower_d["hold-after"] >> NUMBER >> goalDesc >> RPAREN
+                    ;
+
+
+
+            structureDef
+                = actionDef
+                    | durativeActionDef
+                    | derivedDef
+                    ;
+
+/************* ACTIONS ****************************/
+
+            actionDef
+	        = LPAREN >> as_lower_d[":action"] >> actionSymbol
+	                 >> as_lower_d[":parameters"] 
+                         >> LPAREN >> typedVariableList >> RPAREN
+                         >> actionDefBody >> RPAREN;
+
+            actionSymbol 
+                = identifier;
+
+// Should allow preGD instead of goalDesc for preconditions -
+// but I can't get the LL(*) parsing to work
+// This means 'preference' preconditions cannot be used
+            actionDefBody
+	        = !( conditionSymbol >> ((LPAREN >> RPAREN) | goalDesc))
+	          >> !( as_lower_d[":effect"] >> ((LPAREN >> RPAREN) | effect));
+
+            conditionSymbol 
+                = as_lower_d[":precondition"]; 
+//preGD
+//	 = prefGD
+//	| LPAREN 'and' preGD* RPAREN
+//	| LPAREN 'forall' LPAREN typedVariableList RPAREN preGD RPAREN
+//	;
+//
+//prefGD
+//	 = LPAREN 'preference' NAME? goalDesc RPAREN
+//	| goalDesc
+//	;
+
+            goalDesc
+	        = atomicTermFormula
+	        | LPAREN >> as_lower_d["and"] >> *goalDesc >> RPAREN
+	        | LPAREN >> as_lower_d["or"]  >> *goalDesc >> RPAREN
+	        | LPAREN >> as_lower_d["not"] >> goalDesc  >> RPAREN
+	        | LPAREN >> as_lower_d["imply"] >> goalDesc >> goalDesc >> RPAREN
+	        | LPAREN >> as_lower_d["exists"]>> LPAREN   >> typedVariableList >> RPAREN 
+                                              >> goalDesc >> RPAREN
+	        | LPAREN >> as_lower_d["forall"] >> LPAREN >> typedVariableList  >> RPAREN 
+                                              >> goalDesc >> RPAREN
+                | fComp;
+
+            fComp
+	        = LPAREN >> binaryComp >> fExp >> fExp >> RPAREN;
+
+            atomicTermFormula
+	        = LPAREN >> predicate >> *term >> RPAREN;
+
+            term = identifier | VARIABLE ;
+
+/************* DURATIVE ACTIONS ****************************/
+
+            durativeActionDef
+	        = LPAREN >> as_lower_d[":durative-action"] >> actionSymbol
+        	         >> as_lower_d[":parameters"] >> LPAREN 
+                         >> typedVariableList >> RPAREN
+                         >> daDefBody >> RPAREN;
+
+            daDefBody
+                = as_lower_d[":duration"] >> durationConstraint
+	        || as_lower_d[":condition"] >> ((LPAREN >> RPAREN) | daGD)
+                || as_lower_d[":effect"] >> ((LPAREN >> RPAREN) | daEffect);
+
+            daGD
+	        = prefTimedGD
+                | LPAREN >> as_lower_d["and"] >> *daGD >> RPAREN
+                | LPAREN >> as_lower_d["forall"] >> LPAREN 
+                         >> typedVariableList >> RPAREN >> daGD >> RPAREN;
+
+            prefTimedGD
+	        = timedGD
+                | LPAREN >> as_lower_d["preference"] >> !NAME >> timedGD >> RPAREN;
+
+            timedGD
+                = LPAREN >> as_lower_d["at"] >> timeSpecifier >> goalDesc >> RPAREN
+                | LPAREN >> as_lower_d["over"] >> interval >> goalDesc >> RPAREN;
+
+            timeSpecifier = as_lower_d["start"] | as_lower_d["end"] ;
+            interval = as_lower_d["all"] ;
+
+/************* DERIVED DEFINITIONS ****************************/
+
+            derivedDef
+	        = LPAREN >> as_lower_d[":derived"] >> typedVariableList >> goalDesc >> RPAREN;
+
+/************* EXPRESSIONS ****************************/
+
+            fExp
+	        = NUMBER
+                | LPAREN >> binaryOp >> fExp >> fExp2 >> RPAREN
+                | LPAREN >> DASH  >> fExp  >> RPAREN 
+                | fHead;
+
+// This is purely a workaround for an ANTLR bug in tree construction
+// http://www.antlr.org/wiki/display/ANTLR3/multiple+occurences+of+a+token+mix+up+the+list+management+in+tree+rewrites
+            fExp2 = fExp;
+
+            fHead
+	        = LPAREN >> functionSymbol >> *term >> RPAREN 
+                | functionSymbol; 
+
+            effect
+                = LPAREN >> as_lower_d["and"] >> *cEffect >> RPAREN 
+                | cEffect;
+
+            cEffect
+	        = LPAREN >> as_lower_d["forall"] >> LPAREN 
+                         >> typedVariableList >> RPAREN >> effect >> RPAREN
+	        | LPAREN >> as_lower_d["when"] >> goalDesc >> condEffect >> RPAREN
+                | pEffect;
+
+            pEffect
+	        = LPAREN >> assignOp >> fHead >> fExp >> RPAREN
+                | LPAREN >> as_lower_d["not"] >> atomicTermFormula >> RPAREN
+                | atomicTermFormula;
+
+
+// TODO: why is this different from the "and cEffect" above? Does it matter?
+            condEffect
+	        = LPAREN >> as_lower_d["and"] >> *pEffect >> RPAREN
+	        | pEffect;
+
+// TODO: should these be uppercase & lexer section?
+            binaryOp = chlit<>('*') | chlit<>('+') | chlit<>('-') | chlit<>('/'); 
+
+            binaryComp = strlit<>(">=") | strlit<>("<=") | chlit<>('>') | chlit<>('<') | chlit<>('=');
+
+            assignOp = as_lower_d["assign"] | as_lower_d["scale-up"] | as_lower_d["scale-down"] | as_lower_d["increase"] | as_lower_d["decrease"] | as_lower_d["change"];
+
+
+
+/************* DURATIONS  ****************************/
+
+            durationConstraint
+	        = LPAREN >> as_lower_d["and"] >> +simpleDurationConstraint >> RPAREN
+                | LPAREN >> RPAREN
+                | simpleDurationConstraint;
+
+            simpleDurationConstraint
+                = LPAREN >> durOp >> as_lower_d["?duration"] >> durValue >> RPAREN
+                | LPAREN >> as_lower_d["at"] >> timeSpecifier >> simpleDurationConstraint >> RPAREN;
+
+            durOp = strlit<>("<=") | strlit<>(">=") | chlit<>('=');
+
+            durValue = NUMBER | fExp ;
+
+            daEffect
+	        = LPAREN >> as_lower_d["and"] >> *daEffect >> RPAREN
+        	| timedEffect
+	        | LPAREN >> as_lower_d["forall"] >> LPAREN >> typedVariableList 
+                         >> RPAREN >> daEffect >> RPAREN
+	        | LPAREN >> as_lower_d["when"] >> daGD >> timedEffect >> RPAREN
+	        | LPAREN >> assignOp >> fHead >> fExpDA >> RPAREN;
+
+            timedEffect
+	        = LPAREN >> as_lower_d["at"] >> timeSpecifier >> daEffect >> RPAREN     // BNF has a-effect here, but not defined anywhere
+	        | LPAREN >> as_lower_d["at"] >> timeSpecifier >> effect >> RPAREN  // <--- effect added as was unable to parse ":effect (and (at start (not (on-table ?x)))" from IPC2008. 
+                | LPAREN >> as_lower_d["at"] >> timeSpecifier >> fAssignDA >> RPAREN
+                | LPAREN >> assignOp >> fHead >> fExp >> RPAREN         // BNF has assign-op-t and f-exp-t here, but not defined anywhere
+                ;
+
+            fAssignDA
+                = LPAREN >> assignOp >> fHead >> fExpDA >> RPAREN;
+
+            fExpDA
+                    = LPAREN >> ((binaryOp >> fExpDA >> fExpDA) | (chlit<>('-') >> fExpDA)) >> RPAREN
+                    | as_lower_d["?duration"]
+                    | fExp
+                    ;
+
+            skipAtEnd
+                =   space_p
+                |   ';' >> (*(anychar_p - '\n')) >> '\n'      //  pddl comment 
+            ;
             //-----------------------------------------------------------------
             //  End grammar definition
             //-----------------------------------------------------------------
@@ -166,110 +400,58 @@ struct pddl_grammar : public grammar<pddl_grammar>
             BOOST_SPIRIT_DEBUG_RULE(typedNameList);
             BOOST_SPIRIT_DEBUG_RULE(singleTypeNameList);
             BOOST_SPIRIT_DEBUG_RULE(problem);
-//            BOOST_SPIRIT_DEBUG_RULE(program);
-//            BOOST_SPIRIT_DEBUG_RULE(programHeading);
-//            BOOST_SPIRIT_DEBUG_RULE(fileIdentifier);
-//            BOOST_SPIRIT_DEBUG_RULE(block);
-//            BOOST_SPIRIT_DEBUG_RULE(labelDeclarationPart);
-//            BOOST_SPIRIT_DEBUG_RULE(label);
-//            BOOST_SPIRIT_DEBUG_RULE(constantDefinitionPart);
-//            BOOST_SPIRIT_DEBUG_RULE(constantDefinition);
-//            BOOST_SPIRIT_DEBUG_RULE(constant);
-//            BOOST_SPIRIT_DEBUG_RULE(unsignedNumber);
-//            BOOST_SPIRIT_DEBUG_RULE(unsignedInteger);
-//            BOOST_SPIRIT_DEBUG_RULE(unsignedReal);
-//            BOOST_SPIRIT_DEBUG_RULE(sign);
-//            BOOST_SPIRIT_DEBUG_RULE(constantIdentifier);
-//            BOOST_SPIRIT_DEBUG_RULE(typeDefinitionPart);
-//            BOOST_SPIRIT_DEBUG_RULE(typeDefinition);
-//            BOOST_SPIRIT_DEBUG_RULE(type);
-//            BOOST_SPIRIT_DEBUG_RULE(simpleType);
-//            BOOST_SPIRIT_DEBUG_RULE(scalarType);
-//            BOOST_SPIRIT_DEBUG_RULE(subrangeType);
-//            BOOST_SPIRIT_DEBUG_RULE(typeIdentifier);
-//            BOOST_SPIRIT_DEBUG_RULE(structuredType);
-//            BOOST_SPIRIT_DEBUG_RULE(unpackedStructuredType);
-//            BOOST_SPIRIT_DEBUG_RULE(arrayType);
-//            BOOST_SPIRIT_DEBUG_RULE(indexType);
-//            BOOST_SPIRIT_DEBUG_RULE(componentType);
-//            BOOST_SPIRIT_DEBUG_RULE(recordType);
-//            BOOST_SPIRIT_DEBUG_RULE(fieldList);
-//            BOOST_SPIRIT_DEBUG_RULE(fixedPart);
-//            BOOST_SPIRIT_DEBUG_RULE(recordSection);
-//            BOOST_SPIRIT_DEBUG_RULE(variantPart);
-//            BOOST_SPIRIT_DEBUG_RULE(tagField);
-//            BOOST_SPIRIT_DEBUG_RULE(variant);
-//            BOOST_SPIRIT_DEBUG_RULE(caseLabelList);
-//            BOOST_SPIRIT_DEBUG_RULE(caseLabel);
-//            BOOST_SPIRIT_DEBUG_RULE(setType);
-//            BOOST_SPIRIT_DEBUG_RULE(baseType);
-//            BOOST_SPIRIT_DEBUG_RULE(fileType);
-//            BOOST_SPIRIT_DEBUG_RULE(pointerType);
-//            BOOST_SPIRIT_DEBUG_RULE(variableDeclarationPart);
-//            BOOST_SPIRIT_DEBUG_RULE(variableDeclaration);
-//            BOOST_SPIRIT_DEBUG_RULE(procedureAndFunctionDeclarationPart);
-//            BOOST_SPIRIT_DEBUG_RULE(procedureOrFunctionDeclaration);
-//            BOOST_SPIRIT_DEBUG_RULE(procedureDeclaration);
-//            BOOST_SPIRIT_DEBUG_RULE(procedureHeading);
-//            BOOST_SPIRIT_DEBUG_RULE(parameterList);
-//            BOOST_SPIRIT_DEBUG_RULE(formalParameterSection);
-//            BOOST_SPIRIT_DEBUG_RULE(parameterGroup);
-//            BOOST_SPIRIT_DEBUG_RULE(functionDeclaration);
-//            BOOST_SPIRIT_DEBUG_RULE(functionHeading);
-//            BOOST_SPIRIT_DEBUG_RULE(resultType);
-//            BOOST_SPIRIT_DEBUG_RULE(statementPart);
-//            BOOST_SPIRIT_DEBUG_RULE(statement);
-//            BOOST_SPIRIT_DEBUG_RULE(unlabelledStatement);
-//            BOOST_SPIRIT_DEBUG_RULE(simpleStatement);
-//            BOOST_SPIRIT_DEBUG_RULE(assignmentStatement);
-//            BOOST_SPIRIT_DEBUG_RULE(variable);
-//            BOOST_SPIRIT_DEBUG_RULE(entireVariable);
-//            BOOST_SPIRIT_DEBUG_RULE(variableIdentifier);
-//            BOOST_SPIRIT_DEBUG_RULE(componentVariable);
-//            BOOST_SPIRIT_DEBUG_RULE(indexedVariable);
-//            BOOST_SPIRIT_DEBUG_RULE(arrayVariable);
-//            BOOST_SPIRIT_DEBUG_RULE(fieldDesignator);
-//            BOOST_SPIRIT_DEBUG_RULE(recordVariable);
-//            BOOST_SPIRIT_DEBUG_RULE(fieldIdentifier);
-//            BOOST_SPIRIT_DEBUG_RULE(fileBuffer);
-//            BOOST_SPIRIT_DEBUG_RULE(fileVariable);
-//            BOOST_SPIRIT_DEBUG_RULE(referencedVariable);
-//            BOOST_SPIRIT_DEBUG_RULE(pointerVariable);
-//            BOOST_SPIRIT_DEBUG_RULE(expression);
-//            BOOST_SPIRIT_DEBUG_RULE(relationalOperator);
-//            BOOST_SPIRIT_DEBUG_RULE(simpleExpression);
-//            BOOST_SPIRIT_DEBUG_RULE(addingOperator);
-//            BOOST_SPIRIT_DEBUG_RULE(term);
-//            BOOST_SPIRIT_DEBUG_RULE(multiplyingOperator);
-//            BOOST_SPIRIT_DEBUG_RULE(factor);
-//            BOOST_SPIRIT_DEBUG_RULE(unsignedConstant);
-//            BOOST_SPIRIT_DEBUG_RULE(functionDesignator);
-//            BOOST_SPIRIT_DEBUG_RULE(functionIdentifier);
-//            BOOST_SPIRIT_DEBUG_RULE(set);
-//            BOOST_SPIRIT_DEBUG_RULE(elementList);
-//            BOOST_SPIRIT_DEBUG_RULE(element);
-//            BOOST_SPIRIT_DEBUG_RULE(procedureStatement);
-//            BOOST_SPIRIT_DEBUG_RULE(procedureIdentifier);
-//            BOOST_SPIRIT_DEBUG_RULE(actualParameter);
-//            BOOST_SPIRIT_DEBUG_RULE(gotoStatement);
-//            BOOST_SPIRIT_DEBUG_RULE(emptyStatement);
-//            BOOST_SPIRIT_DEBUG_RULE(empty);
-//            BOOST_SPIRIT_DEBUG_RULE(structuredStatement);
-//            BOOST_SPIRIT_DEBUG_RULE(compoundStatement);
-//            BOOST_SPIRIT_DEBUG_RULE(conditionalStatement);
-//            BOOST_SPIRIT_DEBUG_RULE(ifStatement);
-//            BOOST_SPIRIT_DEBUG_RULE(caseStatement);
-//            BOOST_SPIRIT_DEBUG_RULE(caseListElement);
-//            BOOST_SPIRIT_DEBUG_RULE(repetetiveStatement);
-//            BOOST_SPIRIT_DEBUG_RULE(whileStatement);
-//            BOOST_SPIRIT_DEBUG_RULE(repeatStatement);
-//            BOOST_SPIRIT_DEBUG_RULE(forStatement);
-//            BOOST_SPIRIT_DEBUG_RULE(forList);
-//            BOOST_SPIRIT_DEBUG_RULE(controlVariable);
-//            BOOST_SPIRIT_DEBUG_RULE(initialValue);
-//            BOOST_SPIRIT_DEBUG_RULE(finalValue);
-//            BOOST_SPIRIT_DEBUG_RULE(withStatement);
-//            BOOST_SPIRIT_DEBUG_RULE(recordVariableList);
+            BOOST_SPIRIT_DEBUG_RULE(constantsDef);
+            BOOST_SPIRIT_DEBUG_RULE(predicatesDef);
+            BOOST_SPIRIT_DEBUG_RULE(atomicFormulaSkeleton);
+            BOOST_SPIRIT_DEBUG_RULE(predicate );
+            BOOST_SPIRIT_DEBUG_RULE(typedVariableList);
+            BOOST_SPIRIT_DEBUG_RULE(singleTypeVarList);
+            BOOST_SPIRIT_DEBUG_RULE(constraints);
+            BOOST_SPIRIT_DEBUG_RULE(structureDef);
+            BOOST_SPIRIT_DEBUG_RULE(actionDef);
+            BOOST_SPIRIT_DEBUG_RULE(actionSymbol );
+            BOOST_SPIRIT_DEBUG_RULE(actionDefBody);
+            BOOST_SPIRIT_DEBUG_RULE(conditionSymbol);
+            BOOST_SPIRIT_DEBUG_RULE(goalDesc);
+            BOOST_SPIRIT_DEBUG_RULE(fComp);
+            BOOST_SPIRIT_DEBUG_RULE(atomicTermFormula);
+            BOOST_SPIRIT_DEBUG_RULE(term);
+            BOOST_SPIRIT_DEBUG_RULE(durativeActionDef);
+            BOOST_SPIRIT_DEBUG_RULE(daDefBody);
+            BOOST_SPIRIT_DEBUG_RULE(daGD);
+            BOOST_SPIRIT_DEBUG_RULE(prefTimedGD);
+            BOOST_SPIRIT_DEBUG_RULE(timedGD);
+            BOOST_SPIRIT_DEBUG_RULE(timeSpecifier);
+            BOOST_SPIRIT_DEBUG_RULE(interval);
+            BOOST_SPIRIT_DEBUG_RULE(derivedDef);
+            BOOST_SPIRIT_DEBUG_RULE(fExp);
+            BOOST_SPIRIT_DEBUG_RULE(fExp2);
+            BOOST_SPIRIT_DEBUG_RULE(fHead);
+            BOOST_SPIRIT_DEBUG_RULE(effect);
+            BOOST_SPIRIT_DEBUG_RULE(cEffect);
+            BOOST_SPIRIT_DEBUG_RULE(pEffect);
+            BOOST_SPIRIT_DEBUG_RULE(condEffect);
+            BOOST_SPIRIT_DEBUG_RULE(binaryOp);
+            BOOST_SPIRIT_DEBUG_RULE(binaryComp);
+            BOOST_SPIRIT_DEBUG_RULE(assignOp);
+            BOOST_SPIRIT_DEBUG_RULE(durationConstraint);
+            BOOST_SPIRIT_DEBUG_RULE(simpleDurationConstraint);
+            BOOST_SPIRIT_DEBUG_RULE(durOp);
+            BOOST_SPIRIT_DEBUG_RULE(durValue);
+            BOOST_SPIRIT_DEBUG_RULE(daEffect);
+            BOOST_SPIRIT_DEBUG_RULE(timedEffect);
+            BOOST_SPIRIT_DEBUG_RULE(fAssignDA);
+            BOOST_SPIRIT_DEBUG_RULE(fExpDA);
+            BOOST_SPIRIT_DEBUG_RULE(conGD);
+            BOOST_SPIRIT_DEBUG_RULE(functionsDef);
+            BOOST_SPIRIT_DEBUG_RULE(functionList);
+            BOOST_SPIRIT_DEBUG_RULE(atomicFunctionSkeleton);
+            BOOST_SPIRIT_DEBUG_RULE(functionSymbol);
+            BOOST_SPIRIT_DEBUG_RULE(functionType);
+            BOOST_SPIRIT_DEBUG_RULE(NAME);
+            BOOST_SPIRIT_DEBUG_RULE(VARIABLE);
+            BOOST_SPIRIT_DEBUG_RULE(NUMBER);
+            BOOST_SPIRIT_DEBUG_RULE(skipAtEnd);
         }
         #endif
 
@@ -280,13 +462,22 @@ struct pddl_grammar : public grammar<pddl_grammar>
         rule<ScannerT>
               string_literal, identifier, pddlDoc, domain, domainNameClause, domainName, 
               requirements, requireDef, requireKey, typesDef, typedNameList, 
-              singleTypeNameList, problem;
-    };
+              singleTypeNameList, constantsDef, predicatesDef, atomicFormulaSkeleton, 
+              predicate, typedVariableList, singleTypeVarList, constraints, structureDef, 
+              actionDef, actionSymbol, actionDefBody, goalDesc, fComp, atomicTermFormula, 
+              term, durativeActionDef, daDefBody, daGD, prefTimedGD, timedGD, timeSpecifier, 
+              interval, derivedDef, fExp, fExp2, fHead, effect, cEffect, pEffect, binaryOp, 
+              binaryComp, assignOp, durationConstraint, simpleDurationConstraint, durOp, 
+              durValue, daEffect, timedEffect, fAssignDA, fExpDA, conGD, condEffect,
+              functionsDef, functionList, atomicFunctionSkeleton, functionSymbol, 
+              functionType, NAME, VARIABLE, NUMBER, conditionSymbol,
+              problem, skipAtEnd; 
+       };
 };
 
 ///////////////////////////////////////////////////////////////////////////////
 //
-//  The Pascal White Space Skipper
+//  The PDDL White Space Skipper
 //
 ///////////////////////////////////////////////////////////////////////////////
 struct pddl_skipper : public grammar<pddl_skipper>
@@ -372,7 +563,7 @@ int
 main(int argc, char* argv[])
 {
     cout << "/////////////////////////////////////////////////////////\n\n";
-    cout << "\t\tPascal Grammar For Spirit...\n\n";
+    cout << "\t\tPDDL Grammar For Spirit...\n\n";
     cout << "/////////////////////////////////////////////////////////\n\n";
 
     if (argc > 1)
