@@ -1,3 +1,6 @@
+#ifndef PDDL_DOMAIN_GRAMMAR_H
+#define PDDL_DOMAIN_GRAMMAR_H
+
 /// PDDL Parser Grammar for Spirit. 
 ///
 /// Adapted from "Antlr grammar for PDDL 3.0" 
@@ -18,7 +21,6 @@
 #include <vector>
 
 ///////////////////////////////////////////////////////////////////////////////
-using namespace std;
 using namespace boost::spirit::classic;
 
 struct pddl_grammar : public grammar<pddl_grammar>
@@ -475,110 +477,4 @@ struct pddl_grammar : public grammar<pddl_grammar>
        };
 };
 
-///////////////////////////////////////////////////////////////////////////////
-//
-//  The PDDL White Space Skipper
-//
-///////////////////////////////////////////////////////////////////////////////
-struct pddl_skipper : public grammar<pddl_skipper>
-{
-    pddl_skipper() {}
-
-    template <typename ScannerT>
-    struct definition
-    {
-        definition(pddl_skipper const& /*self*/)
-        {
-            skip
-                =   space_p
-                |   ';' >> (*(anychar_p - '\n')) >> '\n'      //  pddl comment 
-            ;
-
-            #ifdef BOOST_SPIRIT_DEBUG
-            BOOST_SPIRIT_DEBUG_RULE(skip);
-            #endif
-        }
-
-        rule<ScannerT>  skip;
-        rule<ScannerT> const&
-        start() const { return skip; }
-    };
-};
-
-///////////////////////////////////////////////////////////////////////////////
-//
-//  Parse a file
-//
-///////////////////////////////////////////////////////////////////////////////
-static void
-parse(char const* filename)
-{
-    ifstream in(filename);
-
-    if (!in)
-    {
-        cerr << "Could not open input file: " << filename << endl;
-        return;
-    }
-
-    in.unsetf(ios::skipws); //  Turn of white space skipping on the stream
-
-    vector<char> vec;
-    std::copy(
-        istream_iterator<char>(in),
-        istream_iterator<char>(),
-        std::back_inserter(vec));
-
-    vector<char>::const_iterator first = vec.begin();
-    vector<char>::const_iterator last = vec.end();
-
-    pddl_skipper skip_p;
-    pddl_grammar p;
-
-#ifdef BOOST_SPIRIT_DEBUG
-    BOOST_SPIRIT_DEBUG_NODE(skip_p);
-    BOOST_SPIRIT_DEBUG_NODE(p);
 #endif
-
-    parse_info<vector<char>::const_iterator> info =
-        parse(first, last, p, skip_p);
-
-    if (info.full)
-    {
-        cout << "\t\t" << filename << " Parses OK\n\n\n";
-    }
-    else
-    {
-        cerr << "---PARSING FAILURE---\n";
-        cerr << string(info.stop, last);
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-//
-//  Main program
-//
-///////////////////////////////////////////////////////////////////////////////
-int
-main(int argc, char* argv[])
-{
-    cout << "/////////////////////////////////////////////////////////\n\n";
-    cout << "\t\tPDDL Grammar For Spirit...\n\n";
-    cout << "/////////////////////////////////////////////////////////\n\n";
-
-    if (argc > 1)
-    {
-        for (int i = 1; i < argc; ++i)
-        {
-            cout << argv[i] << endl;
-            parse(argv[i]);
-        }
-    }
-    else
-    {
-        cerr << "---NO FILENAME GIVEN---" << endl;
-    }
-
-    return 0;
-}
-
