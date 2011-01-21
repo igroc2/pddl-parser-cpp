@@ -1,5 +1,5 @@
-#include "DomainParser.h"
 #include "PddlDomainGrammar.h"
+#include "DomainParser.h"
 #include "PddlCommon.h"
 
 using namespace std;
@@ -30,8 +30,8 @@ std::auto_ptr<Domain> DomainParser::parseDomain(const string& filename)
     vector<char>::const_iterator first = vec.begin();
     vector<char>::const_iterator last = vec.end();
 
-    pddl_skipper skip_p;
-    pddl_grammar p;
+    std::auto_ptr<pddl_skipper> skip_p = create_pddl_skipper();
+    std::auto_ptr<pddl_grammar> p = create_pddl_grammar();
 
 #ifdef BOOST_SPIRIT_DEBUG
     BOOST_SPIRIT_DEBUG_NODE(skip_p);
@@ -39,7 +39,7 @@ std::auto_ptr<Domain> DomainParser::parseDomain(const string& filename)
 #endif
 
     parse_info<vector<char>::const_iterator> info =
-        parse(first, last, p, skip_p);
+        parse(first, last, *p, *skip_p);
 
     if (info.full)
     {
@@ -54,32 +54,4 @@ std::auto_ptr<Domain> DomainParser::parseDomain(const string& filename)
     return std::auto_ptr<Domain>();
 }
 
-///////////////////////////////////////////////////////////////////////////////
-//
-//  Main program
-//
-///////////////////////////////////////////////////////////////////////////////
-int
-main(int argc, char* argv[])
-{
-    cout << "/////////////////////////////////////////////////////////\n\n";
-    cout << "\t\tPDDL Grammar For Spirit...\n\n";
-    cout << "/////////////////////////////////////////////////////////\n\n";
-
-    if (argc > 1)
-    {
-        for (int i = 1; i < argc; ++i)
-        {
-            cout << argv[i] << endl;
-            DomainParser p;
-            p.parseDomain(argv[i]);
-        }
-    }
-    else
-    {
-        cerr << "---NO FILENAME GIVEN---" << endl;
-    }
-
-    return 0;
-}
 

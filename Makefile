@@ -1,2 +1,0 @@
-domainParser:
-	g++ DomainParser.cpp

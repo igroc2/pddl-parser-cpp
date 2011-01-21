@@ -477,4 +477,6 @@ struct pddl_grammar : public grammar<pddl_grammar>
        };
 };
 
+std::auto_ptr<pddl_grammar> create_pddl_grammar();
+
 #endif

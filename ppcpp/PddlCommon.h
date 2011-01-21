@@ -37,4 +37,6 @@ struct pddl_skipper : public grammar<pddl_skipper>
     };
 };
 
+std::auto_ptr<pddl_skipper> create_pddl_skipper();
+
 #endif
