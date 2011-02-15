@@ -5,14 +5,10 @@
 #include <vector>
 #include <map>
 #include <memory>
+#include <set>
 
-struct Type {
-        std::string typeName;
-};
-
-struct TypeInheritance {
-        std::multimap<Type*, Type*> inheritsFrom;
-};
+typedef std::string Type;
+typedef std::multimap<Type, Type> TypeInheritance; //< multimap with (InheritsFrom -> Inherited) 
 
 struct TypedVariable {
         std::string name;
@@ -113,17 +109,36 @@ struct ForallGoalDesc : public GoalDesc {
 
 struct Domain {
         std::string domainName;
-        std::vector<std::string> requirements;   
-        std::vector<Type*> types;   
+        std::set<std::string> requirements;   
+	typedef std::set<std::string> TypeSet;
+	TypeSet types;   
         TypeInheritance typeInheritance;
         std::vector<Function*> functions;
         std::vector<Constant*> constants;
         std::vector<Predicate*> predicates;
+	
+	std::string toString() const;
 };
 
 class DomainParser {
         public:
         std::auto_ptr<Domain> parseDomain(const std::string& filename);
 };
+
+
+
+
+/* Global Temporary Variables Used During Parsing */
+
+/// the current domain being parsed
+extern Domain domain;
+/// used for fill the TypeInheritance map
+extern Domain::TypeSet currentTypeSet;
+
+/* Functions used during parsing */
+
+void initializeTypeNameList(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last); 
+void insertTypeIntoCurrentTypeSet(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last); 
+void insertTypeInheritance(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last); 
 
 #endif

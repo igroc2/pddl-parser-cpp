@@ -11,14 +11,19 @@
 /// ! means throw away that part while building the token's string value. 
 /// ^ means the current node should become the root for the AST.
 
+#include "DomainParser.h"
+
 #define BOOST_SPIRIT_DEBUG  ///$$$ DEFINE THIS WHEN DEBUGGING $$$///
 #include <boost/spirit/include/classic_core.hpp>
 #include <boost/spirit/include/classic_grammar.hpp>
 #include <boost/spirit/include/classic_symbols.hpp>
 
+#include <boost/spirit/include/classic_assign_actor.hpp>
+
 #include <fstream>
 #include <iostream>
 #include <vector>
+
 
 ///////////////////////////////////////////////////////////////////////////////
 using namespace boost::spirit::classic;
@@ -67,19 +72,20 @@ struct pddl_grammar : public grammar<pddl_grammar>
                 = as_lower_d[
                     lexeme_d[
                         (alpha_p >> *(alnum_p | '-' | '_'))
-                        - (keywords >> anychar_p - (alnum_p | '-' | '_'))
+                        - (keywords >> (anychar_p - (alnum_p | '-' | '_')))
                     ]
                 ];
 
             string_literal
                 = lexeme_d[ chlit<>('\'') >>
-                   +( strlit<>("\'\'") | anychar_p-chlit<>('\'') ) >>
+                   +( strlit<>("\'\'") | (anychar_p-chlit<>('\''))) >>
                    chlit<>('\'') ];
 
             pddlDoc
-                =   domain; //| problem;
+                =   domainR; 
+		  //| problem;
 
-            domain
+            domainR
                 =   LPAREN >> DEFINE >> domainNameClause
                         >> !requireDef  
                         >> !typesDef   
@@ -96,7 +102,7 @@ struct pddl_grammar : public grammar<pddl_grammar>
                           >> RPAREN;
 
             domainName 
-                = identifier;
+                = identifier[assign_a(domain.domainName)];
 
             requireDef 
                 = LPAREN >> REQUIREMENTS >> +requireKey 
@@ -126,7 +132,7 @@ struct pddl_grammar : public grammar<pddl_grammar>
 
             typesDef
                  =  LPAREN >> as_lower_d[":types"] 
-                           >> typedNameList >> RPAREN;
+                           >> typedNameList[&initializeTypeNameList] >> RPAREN;
 
             // If have any typed names, they must come FIRST!
             typedNameList
@@ -134,7 +140,7 @@ struct pddl_grammar : public grammar<pddl_grammar>
                  //=  (*identifier | +singleTypeNameList >> *identifier); <-- didn't work for "(:constants no-block - block)"
 
             singleTypeNameList
-                 = +identifier >> DASH >> identifier;
+                 = +identifier[&insertTypeIntoCurrentTypeSet] >> DASH >> identifier[&insertTypeInheritance];
 
             functionsDef
                  = LPAREN >> as_lower_d[":functions"] >> functionList >> RPAREN;
@@ -392,7 +398,7 @@ struct pddl_grammar : public grammar<pddl_grammar>
             BOOST_SPIRIT_DEBUG_RULE(identifier);
             BOOST_SPIRIT_DEBUG_RULE(string_literal);
             BOOST_SPIRIT_DEBUG_RULE(pddlDoc);
-            BOOST_SPIRIT_DEBUG_RULE(domain);
+            BOOST_SPIRIT_DEBUG_RULE(domainR);
             BOOST_SPIRIT_DEBUG_RULE(domainNameClause);
             BOOST_SPIRIT_DEBUG_RULE(domainName);
             BOOST_SPIRIT_DEBUG_RULE(requirements);
@@ -462,7 +468,7 @@ struct pddl_grammar : public grammar<pddl_grammar>
 
         symbols<> keywords;
         rule<ScannerT>
-              string_literal, identifier, pddlDoc, domain, domainNameClause, domainName, 
+              string_literal, identifier, pddlDoc, domainR, domainNameClause, domainName, 
               requirements, requireDef, requireKey, typesDef, typedNameList, 
               singleTypeNameList, constantsDef, predicatesDef, atomicFormulaSkeleton, 
               predicate, typedVariableList, singleTypeVarList, constraints, structureDef, 
