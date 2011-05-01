@@ -79,19 +79,60 @@ std::string Domain::toString() const
     }
     s += "\n";
     
+    // predicates
+    s += "predicates:\n";
+    BOOST_FOREACH(Predicates::value_type p, domain.predicates) {
+      s += std::string("(") + p->name;
+      BOOST_FOREACH(Predicate::TypedVariableList::value_type t, p->typedVariableList) {
+          s += " " + t.name + " - " + t.type; 
+      }
+      s += ")\n";
+    }
+    s += "\n";
+    
     return s;
 }
 
+Domain::~Domain() {
+    BOOST_FOREACH(Function* f, functions) {
+        delete f;
+    }
+    BOOST_FOREACH(Constant* f, constants) {
+        delete f;
+    }
+    BOOST_FOREACH(Predicate* f, predicates) {
+        delete f;
+    }
+}
+
 Domain domain;
+
+
+
+
+/* Inserting Types */
+
+/*
+ * Example of types:
+ *
+ * (:types truck airplane - vehicle
+           package vehicle - thing
+           airport - location
+           city location thing - object)
+ *
+ */
+
+/// used for fill the TypeInheritance map
 Domain::TypeSet currentTypeSet;
 
-void initializeTypeNameList(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last)
+void insertTypeNameList(std::vector<char>::const_iterator /*first*/ , std::vector<char>::const_iterator /*last*/)
 {
   Type object("object");
   Type number("number");
   // inserting the default PDDL types 
   domain.types.insert(object);
   domain.types.insert(number);
+  currentTypeSet.clear();
 }
 
 /// Inserts the current type into currentTypeSet, as well as domain.types.
@@ -101,6 +142,7 @@ void insertTypeIntoCurrentTypeSet(std::vector<char>::const_iterator first, std::
     Type t(typeName); 
     currentTypeSet.insert(t);
     domain.types.insert(t); 
+    std::cout << "Type [" << t << "] into domain.types" << std::endl;
 }
 
 void insertTypeInheritance(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last)
@@ -111,7 +153,63 @@ void insertTypeInheritance(std::vector<char>::const_iterator first, std::vector<
     std::string base(first, last);
     BOOST_FOREACH(std::string type, currentTypeSet) {
       domain.typeInheritance.insert(std::make_pair(type, base)); 
+      std::cout << "Type inheritance [" << type << "->" << base << "] into domain.typeInheritance" << std::endl;
     }
     currentTypeSet.clear();
 }
+
+
+
+
+
+/* Inserting Predicates */
+
+void insertPredicates(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last)
+{
+}
+
+/*
+ * example:
+   (:predicates (in-city ?l - location ?c - city)
+                (at ?obj - thing ?l - location)
+                (in ?p - package ?veh - vehicle))
+ */
+
+Predicate* currentPredicate;
+std::set<std::string> currentSingleTypeVarList;
+Predicate::TypedVariableList currentTypedVariableList;
+
+void insertNewPredicate(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last)
+{
+    currentPredicate = new Predicate;
+    currentPredicate->name = std::string(first, last); 
+    domain.predicates.push_back(currentPredicate); 
+    currentTypedVariableList.clear();
+    currentSingleTypeVarList.clear();
+}
+
+void insertSingleTypedVariableListIntoCurrentTypedVariableList(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last)
+{
+    Type type(first, last);
+    BOOST_FOREACH(std::string var, currentSingleTypeVarList) {
+      TypedVariable v;
+      v.name = var;
+      v.type = type; 
+      currentTypedVariableList.push_back(v); 
+      std::cout << "Typed variable [" << var << " - " << type << "] into predicate [" << currentPredicate->name << "]" << std::endl;
+    }
+    currentSingleTypeVarList.clear();
+}
+
+void insertVariableIntoCurrentSingleTypeVarList(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last)
+{
+    std::string var(first, last);
+    currentSingleTypeVarList.insert(var); 
+}
+
+void insertTypedVariableListIntoCurrentPredicate(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last)
+{
+    currentPredicate->typedVariableList.swap(currentTypedVariableList); 
+}
+
 

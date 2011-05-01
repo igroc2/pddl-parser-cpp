@@ -132,7 +132,7 @@ struct pddl_grammar : public grammar<pddl_grammar>
 
             typesDef
                  =  LPAREN >> as_lower_d[":types"] 
-                           >> typedNameList[&initializeTypeNameList] >> RPAREN;
+                           >> typedNameList[&insertTypeNameList] >> RPAREN;
 
             // If have any typed names, they must come FIRST!
             typedNameList
@@ -170,7 +170,7 @@ struct pddl_grammar : public grammar<pddl_grammar>
                           >> RPAREN;
 
             atomicFormulaSkeleton
-	         = LPAREN >> predicate >> typedVariableList >> RPAREN;
+	         = LPAREN >> predicate[&insertNewPredicate] >> typedVariableList[&insertTypedVariableListIntoCurrentPredicate] >> RPAREN;
 
             predicate 
                 = identifier;
@@ -181,7 +181,7 @@ struct pddl_grammar : public grammar<pddl_grammar>
                 // = (*VARIABLE | +singleTypeVarList >> *VARIABLE); <--- didn't work for (:predicates (on-table ?x - block))
 
             singleTypeVarList
-                = (+VARIABLE >> DASH >> identifier);
+                = (+VARIABLE[&insertVariableIntoCurrentSingleTypeVarList] >> DASH >> identifier[&insertSingleTypedVariableListIntoCurrentTypedVariableList]);
 
             constraints
 	        = LPAREN >> as_lower_d[":constraints"] >> conGD >> RPAREN;

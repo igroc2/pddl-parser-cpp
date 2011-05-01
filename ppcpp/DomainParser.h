@@ -12,7 +12,7 @@ typedef std::multimap<Type, Type> TypeInheritance; //< multimap with (InheritsFr
 
 struct TypedVariable {
         std::string name;
-        Type& type;
+        Type type;
 };
 
 struct Function {
@@ -22,12 +22,13 @@ struct Function {
 
 struct Constant {
         std::string name;
-        Type& type; 
+        Type type; 
 };
 
 struct Predicate {
         std::string name;
-        std::vector<TypedVariable> typedVariableList;
+        typedef std::vector<TypedVariable> TypedVariableList;
+        TypedVariableList typedVariableList;
 };
 
 struct Constraint {
@@ -108,15 +109,18 @@ struct ForallGoalDesc : public GoalDesc {
 };
 
 struct Domain {
-        std::string domainName;
-        std::set<std::string> requirements;   
+    std::string domainName;
+    std::set<std::string> requirements;   
 	typedef std::set<std::string> TypeSet;
 	TypeSet types;   
-        TypeInheritance typeInheritance;
-        std::vector<Function*> functions;
-        std::vector<Constant*> constants;
-        std::vector<Predicate*> predicates;
+    TypeInheritance typeInheritance;
+    std::vector<Function*> functions;
+    std::vector<Constant*> constants;
+    typedef std::vector<Predicate*> Predicates;
+    Predicates predicates;
 	
+    ~Domain();
+
 	std::string toString() const;
 };
 
@@ -126,19 +130,23 @@ class DomainParser {
 };
 
 
-
-
 /* Global Temporary Variables Used During Parsing */
 
 /// the current domain being parsed
 extern Domain domain;
-/// used for fill the TypeInheritance map
-extern Domain::TypeSet currentTypeSet;
 
-/* Functions used during parsing */
 
-void initializeTypeNameList(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last); 
+/*** Functions used during parsing ***/
+
+/* type-related functions */
+void insertTypeNameList(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last); 
 void insertTypeIntoCurrentTypeSet(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last); 
 void insertTypeInheritance(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last); 
+
+/*predicate-related functions */
+void insertNewPredicate(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last);
+void insertSingleTypedVariableListIntoCurrentTypedVariableList(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last);
+void insertVariableIntoCurrentSingleTypeVarList(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last);
+void insertTypedVariableListIntoCurrentPredicate(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last);
 
 #endif
