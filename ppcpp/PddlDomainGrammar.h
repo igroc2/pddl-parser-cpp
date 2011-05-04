@@ -146,10 +146,10 @@ struct pddl_grammar : public grammar<pddl_grammar>
                  = LPAREN >> as_lower_d[":functions"] >> functionList >> RPAREN;
 
             functionList
-                 = *(+atomicFunctionSkeleton >> !(DASH >> functionType));
+                 = *(+atomicFunctionSkeleton >> !(DASH >> functionType[&insertFunctionTypeIntoCurrentFunction]));
 
             atomicFunctionSkeleton
-	         = LPAREN >> functionSymbol >> typedVariableList  >> RPAREN;
+	         = LPAREN >> functionSymbol[&insertNewFunction] >> typedVariableList[&insertTypedVariableListIntoCurrentFunction]  >> RPAREN;
 
             functionSymbol  = NAME ;
         

@@ -90,6 +90,18 @@ std::string Domain::toString() const
     }
     s += "\n";
     
+    // predicates
+    s += "functions:\n";
+    BOOST_FOREACH(Functions::value_type p, domain.functions) {
+      s += std::string("(") + p->functionSymbol;
+      if(!p->functionType.empty()) s += " - " + p->functionType + " ";
+      BOOST_FOREACH(Predicate::TypedVariableList::value_type t, p->typedVariableList) {
+          s += " " + t.name + " - " + t.type; 
+      }
+      s += ")\n";
+    }
+    s += "\n";
+    
     return s;
 }
 
@@ -211,5 +223,52 @@ void insertTypedVariableListIntoCurrentPredicate(std::vector<char>::const_iterat
 {
     currentPredicate->typedVariableList.swap(currentTypedVariableList); 
 }
+
+
+
+
+
+
+/* An example of a function is:
+ *
+(:functions (drive-time ?from ?to - location))
+*/
+
+Function* currentFunction;
+
+void insertNewFunction(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last)
+{
+    currentFunction = new Function;
+    currentFunction->functionSymbol = std::string(first, last); 
+    domain.functions.push_back(currentFunction); 
+    currentTypedVariableList.clear();
+    currentSingleTypeVarList.clear();
+}
+
+void insertFunctionTypeIntoCurrentFunction(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last)
+{
+    currentFunction->functionType = std::string(first, last);
+}
+
+void insertTypedVariableListIntoCurrentFunction(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last)
+{
+    currentFunction->typedVariableList.swap(currentTypedVariableList); 
+}
+
+
+/* An example of a durative action is:
+ *
+(:durative-action load
+ :parameters (?p - package ?t - truck ?a1 - truckarea ?l - location)
+ :duration (= ?duration 1)
+ :condition (and (at start (at ?p ?l)) (at start (free ?a1 ?t))
+  		 (at start (forall (?a2 - truckarea)
+  			      (imply (closer ?a2 ?a1) (free ?a2 ?t))))
+	         (over all (at ?t ?l)) 
+  		 (over all (forall (?a2 - truckarea)
+  			      (imply (closer ?a2 ?a1) (free ?a2 ?t)))))
+ :effect (and (at start (not (at ?p ?l))) (at start (not (free ?a1 ?t)))
+  	 (at end (in ?p ?t ?a1))))
+*/
 
 

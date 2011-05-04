@@ -18,6 +18,7 @@ struct TypedVariable {
 struct Function {
         std::string functionSymbol;
         std::vector<TypedVariable> typedVariableList;
+        std::string functionType; //< optional field; is empty if not provided in the domain
 };
 
 struct Constant {
@@ -114,7 +115,8 @@ struct Domain {
 	typedef std::set<std::string> TypeSet;
 	TypeSet types;   
     TypeInheritance typeInheritance;
-    std::vector<Function*> functions;
+    typedef std::vector<Function*> Functions;
+    Functions functions;
     std::vector<Constant*> constants;
     typedef std::vector<Predicate*> Predicates;
     Predicates predicates;
@@ -148,5 +150,10 @@ void insertNewPredicate(std::vector<char>::const_iterator first, std::vector<cha
 void insertSingleTypedVariableListIntoCurrentTypedVariableList(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last);
 void insertVariableIntoCurrentSingleTypeVarList(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last);
 void insertTypedVariableListIntoCurrentPredicate(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last);
+
+/*function-related functions */
+void insertNewFunction(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last);
+void insertFunctionTypeIntoCurrentFunction(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last);
+void insertTypedVariableListIntoCurrentFunction(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last);
 
 #endif
