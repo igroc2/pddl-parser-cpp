@@ -265,9 +265,9 @@ struct pddl_grammar : public grammar<pddl_grammar>
 /************* DURATIVE ACTIONS ****************************/
 
             durativeActionDef
-	        = LPAREN >> as_lower_d[":durative-action"] >> actionSymbol
+	        = LPAREN >> as_lower_d[":durative-action"] >> actionSymbol[&insertNewDurativeAction]
         	         >> as_lower_d[":parameters"] >> LPAREN 
-                         >> typedVariableList >> RPAREN
+                         >> typedVariableList[&insertParametersIntoCurrentDurativeAction] >> RPAREN
                          >> daDefBody >> RPAREN;
 
             daDefBody

@@ -32,94 +32,45 @@ struct Predicate {
         TypedVariableList typedVariableList;
 };
 
-struct Constraint {
+struct DurationConstraint {
 };
 
-struct AndConstraint: public Constraint {
-        std::vector<Constraint*> constitutingConstraints;
+struct DurativeCondition {
 };
 
-struct ForAllConstraint: public Constraint {
-        //TODO
+struct DurativeEffect {
 };
 
-struct GoalDesc {
+struct DurativeAction {
+    std::string name;
+    std::vector<TypedVariable> parameters;
+    DurationConstraint durationConstraint;
+    DurativeCondition  durativeCondition;     
+    DurativeEffect     durativeEffect;     
 };
 
-struct AtEndConstraint: public Constraint {
-        GoalDesc goalDesc;
-};
-
-struct AlwaysConstraint: public Constraint {
-        GoalDesc goalDesc;
-};
-
-struct SometimeConstraint: public Constraint {
-        GoalDesc goalDesc;
-};
-
-struct WithinConstraint: public Constraint {
-        int num;
-};
-
-struct AtMostOnceConstraint: public Constraint {
-        GoalDesc goalDesc;
-};
-
-struct SometimeAfterConstraint: public Constraint {
-        GoalDesc goalDesc;
-};
-
-struct SometimeBeforeConstraint: public Constraint {
-        GoalDesc goalDesc;
-};
-
-struct AlwaysWithinConstraint: public Constraint {
-        GoalDesc goalDesc;
-};
-
-struct HoldsDuringConstraint: public Constraint {
-        GoalDesc goalDesc;
-};
-
-struct HoldsAfterConstraint: public Constraint {
-        GoalDesc goalDesc;
-};
-
-struct AndGoalDesc : public GoalDesc {
-        std::vector<GoalDesc*> constitutingGoalDescs;
-};
-
-struct OrGoalDesc : public GoalDesc {
-        std::vector<GoalDesc*> constitutingGoalDescs;
-};
-
-struct NotGoalDesc : public GoalDesc {
-        GoalDesc goalDesc;
-};
-
-struct ImplyGoalDesc : public GoalDesc {
-        GoalDesc impliesGoalDesc;
-        GoalDesc impliedGoalDesc;
-};
-
-struct ExistsGoalDesc : public GoalDesc {
-};
-
-struct ForallGoalDesc : public GoalDesc {
+struct NondurativeAction {
 };
 
 struct Domain {
     std::string domainName;
     std::set<std::string> requirements;   
+    /* types */
 	typedef std::set<std::string> TypeSet;
 	TypeSet types;   
     TypeInheritance typeInheritance;
+    /* functions */
     typedef std::vector<Function*> Functions;
     Functions functions;
-    std::vector<Constant*> constants;
+    /* constants */
+    typedef std::vector<Constant*> Constants;
+    Constants constants;
+    /* predicates */
     typedef std::vector<Predicate*> Predicates;
     Predicates predicates;
+    /* durative actions */
+    typedef std::vector<DurativeAction*> DurativeActions;
+    DurativeActions durativeActions;
 	
     ~Domain();
 
@@ -155,5 +106,9 @@ void insertTypedVariableListIntoCurrentPredicate(std::vector<char>::const_iterat
 void insertNewFunction(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last);
 void insertFunctionTypeIntoCurrentFunction(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last);
 void insertTypedVariableListIntoCurrentFunction(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last);
+
+/*action-definition-related functions */
+void insertNewDurativeAction(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last);
+void insertParametersIntoCurrentDurativeAction(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last);
 
 #endif

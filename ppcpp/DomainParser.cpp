@@ -90,7 +90,7 @@ std::string Domain::toString() const
     }
     s += "\n";
     
-    // predicates
+    // functions
     s += "functions:\n";
     BOOST_FOREACH(Functions::value_type p, domain.functions) {
       s += std::string("(") + p->functionSymbol;
@@ -98,6 +98,19 @@ std::string Domain::toString() const
       BOOST_FOREACH(Predicate::TypedVariableList::value_type t, p->typedVariableList) {
           s += " " + t.name + " - " + t.type; 
       }
+      s += ")\n";
+    }
+    s += "\n";
+    
+    // durative actions
+    s += "durative actions:\n";
+    BOOST_FOREACH(DurativeActions::value_type p, domain.durativeActions) {
+      s += std::string("(") + p->name;
+      s += "(:parameters ";
+      BOOST_FOREACH(Predicate::TypedVariableList::value_type t, p->parameters) {
+          s += " " + t.name + " - " + t.type; 
+      }
+      s += ")\n";
       s += ")\n";
     }
     s += "\n";
@@ -144,7 +157,6 @@ void insertTypeNameList(std::vector<char>::const_iterator /*first*/ , std::vecto
   // inserting the default PDDL types 
   domain.types.insert(object);
   domain.types.insert(number);
-  currentTypeSet.clear();
 }
 
 /// Inserts the current type into currentTypeSet, as well as domain.types.
@@ -175,11 +187,6 @@ void insertTypeInheritance(std::vector<char>::const_iterator first, std::vector<
 
 
 /* Inserting Predicates */
-
-void insertPredicates(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last)
-{
-}
-
 /*
  * example:
    (:predicates (in-city ?l - location ?c - city)
@@ -196,8 +203,6 @@ void insertNewPredicate(std::vector<char>::const_iterator first, std::vector<cha
     currentPredicate = new Predicate;
     currentPredicate->name = std::string(first, last); 
     domain.predicates.push_back(currentPredicate); 
-    currentTypedVariableList.clear();
-    currentSingleTypeVarList.clear();
 }
 
 void insertSingleTypedVariableListIntoCurrentTypedVariableList(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last)
@@ -222,6 +227,7 @@ void insertVariableIntoCurrentSingleTypeVarList(std::vector<char>::const_iterato
 void insertTypedVariableListIntoCurrentPredicate(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last)
 {
     currentPredicate->typedVariableList.swap(currentTypedVariableList); 
+    currentTypedVariableList.clear();
 }
 
 
@@ -241,8 +247,6 @@ void insertNewFunction(std::vector<char>::const_iterator first, std::vector<char
     currentFunction = new Function;
     currentFunction->functionSymbol = std::string(first, last); 
     domain.functions.push_back(currentFunction); 
-    currentTypedVariableList.clear();
-    currentSingleTypeVarList.clear();
 }
 
 void insertFunctionTypeIntoCurrentFunction(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last)
@@ -253,6 +257,7 @@ void insertFunctionTypeIntoCurrentFunction(std::vector<char>::const_iterator fir
 void insertTypedVariableListIntoCurrentFunction(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last)
 {
     currentFunction->typedVariableList.swap(currentTypedVariableList); 
+    currentTypedVariableList.clear();
 }
 
 
@@ -271,4 +276,18 @@ void insertTypedVariableListIntoCurrentFunction(std::vector<char>::const_iterato
   	 (at end (in ?p ?t ?a1))))
 */
 
+DurativeAction* currentDurativeAction;
+
+void insertNewDurativeAction(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last)
+{
+    currentDurativeAction = new DurativeAction;
+    currentDurativeAction->name = std::string(first, last); 
+    domain.durativeActions.push_back(currentDurativeAction); 
+}
+
+void insertParametersIntoCurrentDurativeAction(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last)
+{
+    currentDurativeAction->parameters.swap(currentTypedVariableList); 
+    currentTypedVariableList.clear();
+}
 
