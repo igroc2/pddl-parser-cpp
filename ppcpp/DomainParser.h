@@ -32,7 +32,27 @@ struct Predicate {
         TypedVariableList typedVariableList;
 };
 
+struct FExp {
+};
+
+enum DurationOp { DURATION_OP_LESS_THAN_EQUAL, DURATION_OP_GREATER_THAN_EQUAL, DURATION_OP_EQUALS };
+enum TimeSpecifier { TIME_SPECIFIER_START, TIME_SPECIFIER_END, TIME_SPECIFIER_NONE };
+enum DurationValueType { DURATION_VALUE_NUMBER, DURATION_VALUE_FEXP };
+
+typedef long DurationValueNumber;
+typedef FExp DurationValueFExp;
+
+struct SimpleDurationConstraint {
+    TimeSpecifier timeSpecifier;
+    DurationOp durationOp;
+    DurationValueType durationValueType; //< NUMBER | fExp
+    DurationValueNumber durationValueNumber;//< set only if durationValueType == DURATION_VALUE_NUMBER
+    DurationValueFExp durationValueFExp;    //< set only if durationValueType == DURATION_VALUE_FEXP 
+};
+
 struct DurationConstraint {
+   typedef std::vector<SimpleDurationConstraint> SimpleDurationConstraints;
+   SimpleDurationConstraints simpleDurationConstraints;     
 };
 
 struct DurativeCondition {
@@ -110,5 +130,12 @@ void insertTypedVariableListIntoCurrentFunction(std::vector<char>::const_iterato
 /*action-definition-related functions */
 void insertNewDurativeAction(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last);
 void insertParametersIntoCurrentDurativeAction(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last);
+void insertDurationConstraintIntoCurrentDurativeAction(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last);
+
+void insertCurrentTimeSpecifier(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last);
+void insertCurrentDurationOp(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last);
+void insertCurrentSimpleDurationConstraint(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last);
+void insertCurrentDurationValueNumber(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last);
+void insertCurrentDurationValueFExp(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last);
 
 #endif

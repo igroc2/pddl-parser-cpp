@@ -3,6 +3,7 @@
 #include "PddlCommon.h"
 #include <iterator>
 #include "boost/foreach.hpp"
+#include "boost/lexical_cast.hpp"
 
 ///////////////////////////////////////////////////////////////////////////////
 //
@@ -111,6 +112,11 @@ std::string Domain::toString() const
           s += " " + t.name + " - " + t.type; 
       }
       s += ")\n";
+      s += "(:duration ";
+      BOOST_FOREACH(DurationConstraint::SimpleDurationConstraints::value_type c, p->durationConstraint.simpleDurationConstraints) {
+         //TODO s += std::string(" ") + c.timeSpecifier + " " + c.durationOp + " " + c.durationValueType; 
+      }
+      s += ")\n";
       s += ")\n";
     }
     s += "\n";
@@ -213,7 +219,7 @@ void insertSingleTypedVariableListIntoCurrentTypedVariableList(std::vector<char>
       v.name = var;
       v.type = type; 
       currentTypedVariableList.push_back(v); 
-      std::cout << "Typed variable [" << var << " - " << type << "] into predicate [" << currentPredicate->name << "]" << std::endl;
+      std::cout << "Typed variable [" << var << " - " << type << "] into currentTypedVariableList" << std::endl;
     }
     currentSingleTypeVarList.clear();
 }
@@ -290,4 +296,83 @@ void insertParametersIntoCurrentDurativeAction(std::vector<char>::const_iterator
     currentDurativeAction->parameters.swap(currentTypedVariableList); 
     currentTypedVariableList.clear();
 }
+
+struct TimeSpecifierHolder {
+    TimeSpecifierHolder()
+    { currentTimeSpecifier = TIME_SPECIFIER_NONE; }
+
+    /// resets TimeSpecifier as soon as it is readOnceReset
+    TimeSpecifier readOnceReset() {
+        TimeSpecifier c = currentTimeSpecifier;
+        currentTimeSpecifier = TIME_SPECIFIER_NONE;
+        return c;
+    }
+    /// parses string to get the TimeSpecifier
+    void write(std::string name) {
+        if(name == "start") currentTimeSpecifier = TIME_SPECIFIER_START;
+        else if(name == "end") currentTimeSpecifier = TIME_SPECIFIER_END;
+        else assert(false);
+    }
+
+private:
+    TimeSpecifier currentTimeSpecifier;
+};
+
+TimeSpecifierHolder currentTimeSpecifierHolder;
+DurationConstraint currentDurationConstraint;
+SimpleDurationConstraint currentSimpleDurationConstraint;
+DurationOp currentDurationOp;
+DurationValueType currentDurationValueType;
+DurationValueNumber currentDurationValueNumber;
+DurationValueFExp currentDurationValueFExp;
+
+void insertDurationConstraintIntoCurrentDurativeAction(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last)
+{
+    currentDurativeAction->durationConstraint = currentDurationConstraint;
+}
+
+void insertCurrentTimeSpecifier(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last) 
+{
+    std::string name(first, last);
+    currentTimeSpecifierHolder.write(name); 
+}
+
+void insertCurrentDurationOp(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last)
+{
+    std::string name(first, last);
+    if(name == "<=") currentDurationOp = DURATION_OP_LESS_THAN_EQUAL;
+    else if(name == ">=") currentDurationOp = DURATION_OP_GREATER_THAN_EQUAL;
+    else if(name == "=") currentDurationOp = DURATION_OP_EQUALS;
+    else assert(false);
+}
+
+void insertCurrentSimpleDurationConstraint(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last)
+{
+    std::string name(first, last);
+    currentSimpleDurationConstraint.timeSpecifier = currentTimeSpecifierHolder.readOnceReset();
+    currentSimpleDurationConstraint.durationOp = currentDurationOp;
+    currentSimpleDurationConstraint.durationValueType = currentDurationValueType;
+    if(currentDurationValueType == DURATION_VALUE_NUMBER) {
+        currentSimpleDurationConstraint.durationValueNumber = currentDurationValueNumber;
+        //TODO currentSimpleDurationConstraint.durationValueFExp = ;
+    }
+    else {
+        currentSimpleDurationConstraint.durationValueNumber = -1;
+        currentSimpleDurationConstraint.durationValueFExp = currentDurationValueFExp;
+    }
+}
+
+void insertCurrentDurationValueNumber(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last)
+{
+    currentDurationValueType = DURATION_VALUE_NUMBER;
+    std::string name(first, last);
+    currentDurationValueNumber = boost::lexical_cast<long>(name);
+}
+
+void insertCurrentDurationValueFExp(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last)
+{
+    currentDurationValueType = DURATION_VALUE_FEXP;
+    //assert(false); //TODO
+}
+
 

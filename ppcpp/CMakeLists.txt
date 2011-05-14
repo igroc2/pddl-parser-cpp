@@ -159,14 +159,22 @@ ADD_TEST(${CP_TESTNAME} ${CP_TESTNAME})
 ENDMACRO(CP_TESTFILE)
 
 
-##SET(ppcpp_domain_test_SRCS
-##DomainParserDriver.cpp
-##)
-##ADD_LIBRARY(ppcpp_domain_test ${ppcpp_plan_test_SRCS})
+SET(ppcpp_test_SRCS
+test/TestPddlParser.cpp
+)
+ADD_LIBRARY(ppcpp_test ${ppcpp_test_SRCS})
 
-CP_TESTFILE(TestDomainParser
+# called "Interactive" as it receives user input
+CP_TESTFILE(TestDomainParserInteractive
     DomainParserDriver.cpp
 )
-TARGET_LINK_LIBRARIES(TestDomainParser 
+TARGET_LINK_LIBRARIES(TestDomainParserInteractive 
+    ppcpp_core 
+)
+
+CP_TESTFILE(TestParser
+    test/TestPddlParser.cpp
+)
+TARGET_LINK_LIBRARIES(TestParser 
     ppcpp_core 
 )

@@ -271,7 +271,7 @@ struct pddl_grammar : public grammar<pddl_grammar>
                          >> daDefBody >> RPAREN;
 
             daDefBody
-                = as_lower_d[":duration"] >> durationConstraint
+                = as_lower_d[":duration"] >> durationConstraint[&insertDurationConstraintIntoCurrentDurativeAction]
 	        || as_lower_d[":condition"] >> ((LPAREN >> RPAREN) | daGD)
                 || as_lower_d[":effect"] >> ((LPAREN >> RPAREN) | daEffect);
 
@@ -289,7 +289,7 @@ struct pddl_grammar : public grammar<pddl_grammar>
                 = LPAREN >> as_lower_d["at"] >> timeSpecifier >> goalDesc >> RPAREN
                 | LPAREN >> as_lower_d["over"] >> interval >> goalDesc >> RPAREN;
 
-            timeSpecifier = as_lower_d["start"] | as_lower_d["end"] ;
+            timeSpecifier = (as_lower_d["start"] | as_lower_d["end"])[&insertCurrentTimeSpecifier];
             interval = as_lower_d["all"] ;
 
 /************* DERIVED DEFINITIONS ****************************/
@@ -346,17 +346,17 @@ struct pddl_grammar : public grammar<pddl_grammar>
 /************* DURATIONS  ****************************/
 
             durationConstraint
-	        = LPAREN >> as_lower_d["and"] >> +simpleDurationConstraint >> RPAREN
+	        = LPAREN >> as_lower_d["and"] >> +(simpleDurationConstraint[&insertCurrentSimpleDurationConstraint]) >> RPAREN
                 | LPAREN >> RPAREN
                 | simpleDurationConstraint;
 
             simpleDurationConstraint
                 = LPAREN >> durOp >> as_lower_d["?duration"] >> durValue >> RPAREN
-                | LPAREN >> as_lower_d["at"] >> timeSpecifier >> simpleDurationConstraint >> RPAREN;
+                | LPAREN >> as_lower_d["at"] >> timeSpecifier[&insertCurrentTimeSpecifier] >> simpleDurationConstraint >> RPAREN;
 
             durOp = strlit<>("<=") | strlit<>(">=") | chlit<>('=');
 
-            durValue = NUMBER | fExp ;
+            durValue = NUMBER[&insertCurrentDurationValueNumber] | fExp[&insertCurrentDurationValueFExp];
 
             daEffect
 	        = LPAREN >> as_lower_d["and"] >> *daEffect >> RPAREN
