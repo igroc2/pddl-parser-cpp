@@ -17,8 +17,9 @@ struct TypedVariable {
 
 struct Function {
         std::string functionSymbol;
-        std::vector<TypedVariable> typedVariableList;
+        std::vector<TypedVariable*> typedVariableList;
         std::string functionType; //< optional field; is empty if not provided in the domain
+        ~Function();
 };
 
 struct Constant {
@@ -28,16 +29,43 @@ struct Constant {
 
 struct Predicate {
         std::string name;
-        typedef std::vector<TypedVariable> TypedVariableList;
+        typedef std::vector<TypedVariable*> TypedVariableList;
         TypedVariableList typedVariableList;
+        ~Predicate();
 };
 
 struct FExp {
+    virtual ~FExp() {}
+};
+
+enum BinaryOp { BINARY_OP_MULTIPLY, BINARY_OP_PLUS, BINARY_OP_MINUS, BINARY_OP_DIVIDE };
+std::string toString(BinaryOp op); 
+
+struct BinaryOpFExp : public FExp {
+    BinaryOp binaryOp;
+    FExp* first;
+    FExp* second; 
+};
+
+/// Variable start with "?" in PDDL.
+/// If not variable, term is a constant identifier
+struct Term {
+    std::string name;
+    bool isVariable() const;
+};
+
+struct FHead : public FExp {
+    std::string functionSymbol;
+    Term term;
 };
 
 enum DurationOp { DURATION_OP_LESS_THAN_EQUAL, DURATION_OP_GREATER_THAN_EQUAL, DURATION_OP_EQUALS };
 enum TimeSpecifier { TIME_SPECIFIER_START, TIME_SPECIFIER_END, TIME_SPECIFIER_NONE };
 enum DurationValueType { DURATION_VALUE_NUMBER, DURATION_VALUE_FEXP };
+
+std::string toString(DurationOp op);
+std::string toString(TimeSpecifier ts);
+std::string toString(DurationValueType dvt);
 
 typedef long DurationValueNumber;
 typedef FExp DurationValueFExp;
@@ -47,12 +75,13 @@ struct SimpleDurationConstraint {
     DurationOp durationOp;
     DurationValueType durationValueType; //< NUMBER | fExp
     DurationValueNumber durationValueNumber;//< set only if durationValueType == DURATION_VALUE_NUMBER
-    DurationValueFExp durationValueFExp;    //< set only if durationValueType == DURATION_VALUE_FEXP 
+    DurationValueFExp* durationValueFExp;    //< set only if durationValueType == DURATION_VALUE_FEXP 
 };
 
 struct DurationConstraint {
-   typedef std::vector<SimpleDurationConstraint> SimpleDurationConstraints;
+   typedef std::vector<SimpleDurationConstraint*> SimpleDurationConstraints;
    SimpleDurationConstraints simpleDurationConstraints;     
+   ~DurationConstraint();
 };
 
 struct DurativeCondition {
@@ -63,10 +92,12 @@ struct DurativeEffect {
 
 struct DurativeAction {
     std::string name;
-    std::vector<TypedVariable> parameters;
+    typedef std::vector<TypedVariable*> Parameters;
+    Parameters parameters;
     DurationConstraint durationConstraint;
     DurativeCondition  durativeCondition;     
     DurativeEffect     durativeEffect;     
+    ~DurativeAction();
 };
 
 struct NondurativeAction {

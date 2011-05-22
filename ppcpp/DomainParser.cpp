@@ -68,24 +68,24 @@ std::string Domain::toString() const
     
     // types
     s += "types:\n";
-    BOOST_FOREACH(Type t, domain.types) {
+    BOOST_FOREACH(const Type& t, domain.types) {
       s += std::string("[") + t + "] ";
     }
     s += "\n\n";
     
     // inheritances
     s += "type inheritances:\n";
-    BOOST_FOREACH(TypeInheritance::value_type t, domain.typeInheritance) {
+    BOOST_FOREACH(TypeInheritance::value_type& t, domain.typeInheritance) {
       s += std::string("[") + t.first + "] -> [" + t.second + "]\n";
     }
     s += "\n";
     
     // predicates
     s += "predicates:\n";
-    BOOST_FOREACH(Predicates::value_type p, domain.predicates) {
+    BOOST_FOREACH(Predicates::value_type& p, domain.predicates) {
       s += std::string("(") + p->name;
-      BOOST_FOREACH(Predicate::TypedVariableList::value_type t, p->typedVariableList) {
-          s += " " + t.name + " - " + t.type; 
+      BOOST_FOREACH(Predicate::TypedVariableList::value_type& t, p->typedVariableList) {
+          s += " " + t->name + " - " + t->type; 
       }
       s += ")\n";
     }
@@ -93,11 +93,11 @@ std::string Domain::toString() const
     
     // functions
     s += "functions:\n";
-    BOOST_FOREACH(Functions::value_type p, domain.functions) {
+    BOOST_FOREACH(Functions::value_type& p, domain.functions) {
       s += std::string("(") + p->functionSymbol;
       if(!p->functionType.empty()) s += " - " + p->functionType + " ";
-      BOOST_FOREACH(Predicate::TypedVariableList::value_type t, p->typedVariableList) {
-          s += " " + t.name + " - " + t.type; 
+      BOOST_FOREACH(Predicate::TypedVariableList::value_type& t, p->typedVariableList) {
+          s += " " + t->name + " - " + t->type; 
       }
       s += ")\n";
     }
@@ -105,16 +105,16 @@ std::string Domain::toString() const
     
     // durative actions
     s += "durative actions:\n";
-    BOOST_FOREACH(DurativeActions::value_type p, domain.durativeActions) {
+    BOOST_FOREACH(DurativeActions::value_type& p, domain.durativeActions) {
       s += std::string("(") + p->name;
       s += "(:parameters ";
-      BOOST_FOREACH(Predicate::TypedVariableList::value_type t, p->parameters) {
-          s += " " + t.name + " - " + t.type; 
+      BOOST_FOREACH(Predicate::TypedVariableList::value_type& t, p->parameters) {
+          s += " " + t->name + " - " + t->type; 
       }
       s += ")\n";
       s += "(:duration ";
-      BOOST_FOREACH(DurationConstraint::SimpleDurationConstraints::value_type c, p->durationConstraint.simpleDurationConstraints) {
-         //TODO s += std::string(" ") + c.timeSpecifier + " " + c.durationOp + " " + c.durationValueType; 
+      BOOST_FOREACH(DurationConstraint::SimpleDurationConstraints::value_type& c, p->durationConstraint.simpleDurationConstraints) {
+         s += std::string(" ") + ::toString(c->timeSpecifier) + " " + ::toString(c->durationOp) + " " + ::toString(c->durationValueType); 
       }
       s += ")\n";
       s += ")\n";
@@ -133,6 +133,33 @@ Domain::~Domain() {
     }
     BOOST_FOREACH(Predicate* f, predicates) {
         delete f;
+    }
+    BOOST_FOREACH(DurativeAction* d, durativeActions) {
+        delete d;
+    }
+}
+
+Function::~Function() {
+    BOOST_FOREACH(TypedVariable* d, typedVariableList) {
+        delete d;
+    }
+}
+
+Predicate::~Predicate() {
+    BOOST_FOREACH(TypedVariable* d, typedVariableList) {
+        delete d;
+    }
+}
+
+DurationConstraint::~DurationConstraint() {
+    BOOST_FOREACH(SimpleDurationConstraint* d, simpleDurationConstraints) {
+        delete d;
+    }
+}
+
+DurativeAction::~DurativeAction() {
+    BOOST_FOREACH(TypedVariable* d, parameters) {
+        delete d;
     }
 }
 
@@ -181,7 +208,7 @@ void insertTypeInheritance(std::vector<char>::const_iterator first, std::vector<
     /// Next, the types within currentTypeSet are inserted into inheritsFrom map.  
     /// Finally, currentTypeSet is cleared.
     std::string base(first, last);
-    BOOST_FOREACH(std::string type, currentTypeSet) {
+    BOOST_FOREACH(const std::string& type, currentTypeSet) {
       domain.typeInheritance.insert(std::make_pair(type, base)); 
       std::cout << "Type inheritance [" << type << "->" << base << "] into domain.typeInheritance" << std::endl;
     }
@@ -214,10 +241,10 @@ void insertNewPredicate(std::vector<char>::const_iterator first, std::vector<cha
 void insertSingleTypedVariableListIntoCurrentTypedVariableList(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last)
 {
     Type type(first, last);
-    BOOST_FOREACH(std::string var, currentSingleTypeVarList) {
-      TypedVariable v;
-      v.name = var;
-      v.type = type; 
+    BOOST_FOREACH(const std::string& var, currentSingleTypeVarList) {
+      TypedVariable* v = new TypedVariable;
+      v->name = var;
+      v->type = type; 
       currentTypedVariableList.push_back(v); 
       std::cout << "Typed variable [" << var << " - " << type << "] into currentTypedVariableList" << std::endl;
     }
@@ -297,6 +324,35 @@ void insertParametersIntoCurrentDurativeAction(std::vector<char>::const_iterator
     currentTypedVariableList.clear();
 }
 
+std::string toString(DurationOp op)
+{
+    switch(op) {
+        case DURATION_OP_LESS_THAN_EQUAL: return "<=";
+        case DURATION_OP_GREATER_THAN_EQUAL: return ">=";
+        case DURATION_OP_EQUALS: return "==";
+        default: assert(false); 
+    }
+}
+
+std::string toString(TimeSpecifier ts)
+{
+    switch(ts) {
+        case TIME_SPECIFIER_START: return "at-start";
+        case TIME_SPECIFIER_END: return "at-end";
+        case TIME_SPECIFIER_NONE: return "at-none";
+        default: assert(false); 
+    }
+}
+
+std::string toString(DurationValueType dvt)
+{
+    switch(dvt) {
+        case DURATION_VALUE_NUMBER: return "num";
+        case DURATION_VALUE_FEXP: return "fexp";
+        default: assert(false); 
+    }
+}
+
 struct TimeSpecifierHolder {
     TimeSpecifierHolder()
     { currentTimeSpecifier = TIME_SPECIFIER_NONE; }
@@ -320,11 +376,11 @@ private:
 
 TimeSpecifierHolder currentTimeSpecifierHolder;
 DurationConstraint currentDurationConstraint;
-SimpleDurationConstraint currentSimpleDurationConstraint;
+SimpleDurationConstraint* currentSimpleDurationConstraint;
 DurationOp currentDurationOp;
 DurationValueType currentDurationValueType;
 DurationValueNumber currentDurationValueNumber;
-DurationValueFExp currentDurationValueFExp;
+DurationValueFExp* currentDurationValueFExp;
 
 void insertDurationConstraintIntoCurrentDurativeAction(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last)
 {
@@ -349,16 +405,18 @@ void insertCurrentDurationOp(std::vector<char>::const_iterator first, std::vecto
 void insertCurrentSimpleDurationConstraint(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last)
 {
     std::string name(first, last);
-    currentSimpleDurationConstraint.timeSpecifier = currentTimeSpecifierHolder.readOnceReset();
-    currentSimpleDurationConstraint.durationOp = currentDurationOp;
-    currentSimpleDurationConstraint.durationValueType = currentDurationValueType;
+    currentSimpleDurationConstraint = new SimpleDurationConstraint;
+    currentDurationConstraint.simpleDurationConstraints.push_back(currentSimpleDurationConstraint); 
+    currentSimpleDurationConstraint->timeSpecifier = currentTimeSpecifierHolder.readOnceReset();
+    currentSimpleDurationConstraint->durationOp = currentDurationOp;
+    currentSimpleDurationConstraint->durationValueType = currentDurationValueType;
     if(currentDurationValueType == DURATION_VALUE_NUMBER) {
-        currentSimpleDurationConstraint.durationValueNumber = currentDurationValueNumber;
+        currentSimpleDurationConstraint->durationValueNumber = currentDurationValueNumber;
         //TODO currentSimpleDurationConstraint.durationValueFExp = ;
     }
     else {
-        currentSimpleDurationConstraint.durationValueNumber = -1;
-        currentSimpleDurationConstraint.durationValueFExp = currentDurationValueFExp;
+        currentSimpleDurationConstraint->durationValueNumber = -1;
+        currentSimpleDurationConstraint->durationValueFExp = currentDurationValueFExp;
     }
 }
 
@@ -369,9 +427,20 @@ void insertCurrentDurationValueNumber(std::vector<char>::const_iterator first, s
     currentDurationValueNumber = boost::lexical_cast<long>(name);
 }
 
+std::string toString(BinaryOp op) {
+    switch(op) {
+        case BINARY_OP_MULTIPLY: return "*";
+        case BINARY_OP_PLUS: return "+";
+        case BINARY_OP_MINUS: return "-";
+        case BINARY_OP_DIVIDE: return "/";
+        default: assert(false); 
+    }
+}
+
 void insertCurrentDurationValueFExp(std::vector<char>::const_iterator first, std::vector<char>::const_iterator last)
 {
     currentDurationValueType = DURATION_VALUE_FEXP;
+    currentDurationValueFExp = new FExp;
     //assert(false); //TODO
 }
 

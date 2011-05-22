@@ -272,7 +272,7 @@ struct pddl_grammar : public grammar<pddl_grammar>
 
             daDefBody
                 = as_lower_d[":duration"] >> durationConstraint[&insertDurationConstraintIntoCurrentDurativeAction]
-	        || as_lower_d[":condition"] >> ((LPAREN >> RPAREN) | daGD)
+	            || as_lower_d[":condition"] >> ((LPAREN >> RPAREN) | daGD)
                 || as_lower_d[":effect"] >> ((LPAREN >> RPAREN) | daEffect);
 
             daGD
