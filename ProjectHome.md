@@ -1,0 +1,1 @@
+Front end for PDDL input or writing a translator. Currently in a pre-alpha version (incomplete ~~and under development~~ **If someone would like to own this project, I would be happy to help.**).
